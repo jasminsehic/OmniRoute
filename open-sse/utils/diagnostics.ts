@@ -268,7 +268,9 @@ export function detectMalformedNonStream(resp: unknown): MalformedReason | null 
     if (content.length === 0) {
       const stopReason = typeof body.stop_reason === "string" ? body.stop_reason : "";
       if (stopReason.length === 0) return null;
-      if (stopReason === "max_tokens" || stopReason === "tool_use") return null;
+      if (stopReason === "max_tokens" || stopReason === "length" || stopReason === "tool_use") {
+        return null;
+      }
       return "empty_choices";
     }
     return "empty_choices";
@@ -277,6 +279,14 @@ export function detectMalformedNonStream(resp: unknown): MalformedReason | null 
   // ── Chat Completions shape ──
   const choices = body.choices;
   if (!Array.isArray(choices) || choices.length === 0) return "empty_choices";
+
+  const firstChoice = choices[0] as Record<string, unknown> | undefined;
+  const finishReason =
+    typeof firstChoice?.finish_reason === "string" ? firstChoice.finish_reason : "";
+
+  if (finishReason === "length" || finishReason === "tool_calls") {
+    return null;
+  }
 
   const anyHasOutput = choices.some((choice) => {
     const c = choice as Record<string, unknown>;

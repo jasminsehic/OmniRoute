@@ -11,6 +11,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { translateNonStreamingResponse } from "../../open-sse/handlers/responseTranslator.ts";
+import { FORMATS } from "../../open-sse/translator/formats.ts";
 import {
   reportMalformed200,
   synthOpenAIErrorChunk,
@@ -109,6 +111,53 @@ test("detectMalformedNonStream returns 'empty_choices' when choice message has n
   const body = {
     choices: [{ message: { content: "", tool_calls: null }, finish_reason: "stop" }],
   };
+  assert.equal(detectMalformedNonStream(body), "empty_choices");
+});
+
+test("detectMalformedNonStream returns null for Claude content:[] with stop_reason length (Ollama/Qwen3 tiny-budget probe)", () => {
+  const body = {
+    type: "message",
+    role: "assistant",
+    content: [],
+    stop_reason: "length",
+    usage: { input_tokens: 29, output_tokens: 1 },
+  };
+
+  assert.equal(detectMalformedNonStream(body), null);
+});
+
+test("Ollama empty length completion survives OpenAI-to-Claude translation", () => {
+  const translated = translateNonStreamingResponse(
+    {
+      id: "chatcmpl-ollama-length",
+      object: "chat.completion",
+      model: "qwen3:8b",
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: "" },
+          finish_reason: "length",
+        },
+      ],
+      usage: { prompt_tokens: 29, completion_tokens: 1, total_tokens: 30 },
+    },
+    FORMATS.OPENAI,
+    FORMATS.CLAUDE
+  );
+
+  assert.deepEqual(translated.content, []);
+  assert.equal(translated.stop_reason, "length");
+  assert.equal(detectMalformedNonStream(translated), null);
+});
+
+test("detectMalformedNonStream still rejects Claude content:[] with an unrelated stop_reason", () => {
+  const body = {
+    type: "message",
+    role: "assistant",
+    content: [],
+    stop_reason: "end_turn",
+  };
+
   assert.equal(detectMalformedNonStream(body), "empty_choices");
 });
 

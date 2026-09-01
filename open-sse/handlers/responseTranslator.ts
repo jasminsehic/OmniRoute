@@ -729,13 +729,16 @@ function convertOpenAINonStreamingToClaude(
   const hasToolCalls = Array.isArray(messageObj.tool_calls) && messageObj.tool_calls.length > 0;
 
   if (messageObj.content !== undefined && messageObj.content !== null) {
-    hasTextOrReasoning = true;
     const resolvedText = toString(messageObj.content);
-    content.push({
-      type: "text",
-      text: resolvedText === "" ? "(empty response)" : resolvedText,
-    });
-  } else if (!hasTextOrReasoning) {
+
+    if (resolvedText !== "") {
+      hasTextOrReasoning = true;
+      content.push({
+        type: "text",
+        text: resolvedText,
+      });
+    }
+  } else if (!hasTextOrReasoning && !hasToolCalls) {
     content.push({
       type: "text",
       text: "(empty response)",
